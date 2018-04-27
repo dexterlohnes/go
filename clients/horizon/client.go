@@ -388,6 +388,22 @@ func (c *Client) StreamTransactions(
 	})
 }
 
+// StreamAllTransactions streams all incoming transactions. Use context.WithCancel to stop streaming or
+// context.Background() if you want to stream indefinitely.
+func (c *Client) StreamAllTransactions(ctx context.Context, cursor *Cursor, handler TransactionHandler) (err error) {
+	c.fixURLOnce.Do(c.fixURL)
+	url := fmt.Sprintf("%s/transactions", c.URL)
+	return c.stream(ctx, url, cursor, func(data []byte) error {
+		var transaction Transaction
+		err = json.Unmarshal(data, &transaction)
+		if err != nil {
+			return errors.Wrap(err, "Error unmarshaling data")
+		}
+		handler(transaction)
+		return nil
+	})
+}
+
 // SubmitTransaction submits a transaction to the network. err can be either error object or horizon.Error object.
 func (c *Client) SubmitTransaction(
 	transactionEnvelopeXdr string,
