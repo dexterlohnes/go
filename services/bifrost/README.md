@@ -18,9 +18,7 @@ It solves many problems connected to moving tokens to Stellar network:
 
 We are releasing the **alpha version** of this software. We encourage our community of developers to test and improve it.
 
-Before running `bifrost`, execute `database/migrations/01_init.sql` SQL queries in your DB. Future Bifrost version will do it automatically.
-
-Download the binary from [the release page](https://github.com/stellar/go/releases/tag/bifrost-v0.0.1) and use it with it's [Bifrost JS SDK](https://github.com/stellar/bifrost-js-sdk).
+Download the binary from [the release page](https://github.com/stellar/go/releases/tag/bifrost-v0.0.2) and use it with it's [Bifrost JS SDK](https://github.com/stellar/bifrost-js-sdk).
 
 ## How it works
 
@@ -60,7 +58,7 @@ https://bifrost.stellar.org/
   * `minimum_value_btc` - minimum transaction value in BTC that will be accepted by Bifrost, everything below will be ignored.
   * `token_price` - a price of one BTC in terms of final token (`stellar.token_asset_code`)
 * `ethereum`
-  * `master_public_key` - master public key for bitcoin keys derivation (read more in [BIP-0032](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki))
+  * `master_public_key` - master public key for ethereum keys derivation (read more in [BIP-0032](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki))
   * `rpc_server` - URL of [geth](https://github.com/ethereum/go-ethereum) >= 1.7.1 RPC server
   * `network_id` - network ID (`3` - Ropsten testnet, `1` - live Ethereum network)
   * `minimum_value_eth` - minimum transaction value in ETH that will be accepted by Bifrost, everything below will be ignored.
@@ -73,7 +71,7 @@ https://bifrost.stellar.org/
   * `horizon` - URL to [horizon](https://github.com/stellar/go/tree/master/services/horizon) server
   * `network_passphrase` - Stellar network passphrase (`Public Global Stellar Network ; September 2015` for production network, `Test SDF Network ; September 2015` for test network)
   * `starting_balance` - Stellar XLM amount issued to created account (41 by default)
-  * `lock_unix_timestamp` - Unix timestamp of a date until funds will be locked in a new account (helpful if you want to disallow trading during token sale)
+  * `lock_unix_timestamp` - Unix timestamp (in seconds) of a date until funds will be locked in a new account (helpful if you want to disallow trading during token sale)
 * `database`
   * `type` - currently the only supported database type is: `postgres`
   * `dsn` - data source name for postgres connection (`postgres://user:password@host/dbname?sslmode=sslmode` - [more info](https://godoc.org/github.com/lib/pq#hdr-Connection_String_Parameters))
@@ -130,3 +128,25 @@ In this configuration all servers have the same `stellar.issuer_public_key` and 
 * Make sure you configured minimum accepted value for Bitcoin and Ethereum transactions to the value you really want.
 * Make sure you start from a fresh Bifrost DB in production. If Bifrost was running, you stopped it and then started it again, all the Bitcoin and Ethereum blocks mined during that period will be processed which can take a lot of time.
 * Make sure that `lock_unix_timestamp` is correct and test it. If the value is too far in the future users will be locked out of their funds.
+
+## FAQ
+
+#### Transactions are not processed by Bifrost
+
+Here is a list of possible reasons why Bifrost may not process transactions:
+
+* Bifrost is detecting transactions but there's a proxy between client and Bifrost server and it's blocking SSE (Server-Sent Events) sent by Bifrost. Solution for this can be found [here](https://serverfault.com/a/801629).
+* There's a long queue of blocks Bifrost needs to process. During the first start of Bifrost, it starts processing blocks from the latest block available. If Bifrost was turned off for a longer time or `geth` is still catchup up it may cause delays. To solve this, recreate Bifrost DB so it resets data or (if you don't want to delete data in a DB) set `ethereum_last_block` value in `key_value_store` table to `0`.
+* You are sending a transaction with amount below `minimum_value_eth`.
+* Geth is connected to one network and you're sending ETH in another network.
+
+#### How do I unlock the account when `lock_unix_timestamp` is set?
+
+You need to submit a special transaction that "unlocks" the account by removing the temporary signer and adding back user's master key. This can be done by everyone: user or organization that runs Bifrost. Transaction can be found in:
+
+* `Bifrost.ExchangedTimelockedEvent` [event](https://github.com/stellar/bifrost-js-sdk#oneventevent-data). You can display it to the user if you want your users to unlock accounts.
+* In database: `recovery_transaction` table. These transactions are independent so you can submit them in any order / at the same time.
+
+#### I don't see answer to my question. What do I do?
+
+Check [Stellar Stack Exchange](https://stellar.stackexchange.com/questions/tagged/bifrost/) to find similar questions or add the new question with the `bifrost` tag.
